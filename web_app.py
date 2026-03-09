@@ -65,59 +65,6 @@ HTML = """
     .btn:hover {
       opacity: 0.95;
     }
-    .hero {
-      background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
-      border: 1px solid #dbeafe;
-    }
-    .hero p {
-      max-width: 900px;
-      line-height: 1.6;
-      margin-bottom: 0;
-    }
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-      margin-top: 18px;
-    }
-    .info-box {
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
-      padding: 18px;
-    }
-    .info-box h3 {
-      margin-bottom: 10px;
-      font-size: 18px;
-    }
-    .info-box ol,
-    .info-box ul {
-      margin: 0;
-      padding-left: 18px;
-      line-height: 1.6;
-    }
-    .risk-mini-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 13px;
-    }
-    .risk-mini-table th,
-    .risk-mini-table td {
-      border: 1px solid #e5e7eb;
-      padding: 8px;
-      text-align: left;
-    }
-    .risk-mini-table th {
-      background: #f1f5f9;
-    }
-    .upload-box {
-      border: 2px dashed #cbd5e1;
-      border-radius: 16px;
-      padding: 20px;
-      background: #f8fafc;
-      margin-top: 14px;
-    }
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -208,6 +155,13 @@ HTML = """
       background: #fef3c7;
       color: #92400e;
     }
+    .upload-box {
+      border: 2px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 20px;
+      background: #f8fafc;
+      margin-top: 14px;
+    }
     .small {
       font-size: 13px;
     }
@@ -226,68 +180,9 @@ HTML = """
 </head>
 <body>
   <div class="wrap">
-    <div class="card hero">
-      <h1>AI Early Warning System for Math Students</h1>
-      <p>
-        This tool analyzes MyLabMath gradebook data to identify students who may be at risk of failing
-        earlier than traditional indicators. It helps instructors quickly review risk levels, identify
-        likely areas of concern, and take early action through outreach and intervention.
-      </p>
-    </div>
-
-    <div class="info-grid">
-      <div class="info-box">
-        <h3>How to Export the File</h3>
-        <ol>
-          <li>Open <strong>MyLabMath</strong>.</li>
-          <li>Go to the <strong>Gradebook</strong>.</li>
-          <li>Select <strong>Overview of Student Averages</strong>.</li>
-          <li>Export the file.</li>
-          <li>Save it as a <strong>CSV</strong>.</li>
-        </ol>
-      </div>
-
-      <div class="info-box">
-        <h3>How to Use This Tool</h3>
-        <ol>
-          <li>Enter your <strong>Instructor Name</strong>.</li>
-          <li>Upload the MyLabMath <strong>CSV</strong> file.</li>
-          <li>Click <strong>Analyze Student Risk</strong>.</li>
-          <li>Review flagged students, download reports, or send emails.</li>
-        </ol>
-      </div>
-
-      <div class="info-box">
-        <h3>How Risk Is Calculated</h3>
-        <table class="risk-mini-table">
-          <tr>
-            <th>Indicator</th>
-            <th>Risk Trigger</th>
-          </tr>
-          <tr>
-            <td>Overall Score</td>
-            <td>Below 70</td>
-          </tr>
-          <tr>
-            <td>Homework Average</td>
-            <td>Below 70</td>
-          </tr>
-          <tr>
-            <td>Quiz Average</td>
-            <td>Below 65</td>
-          </tr>
-          <tr>
-            <td>Test Average</td>
-            <td>Below 65</td>
-          </tr>
-        </table>
-        <p class="small muted" style="margin-top:10px;">
-          Risk levels: <strong>0–2 = Low</strong>, <strong>3–5 = Medium</strong>, <strong>6+ = High</strong>.
-        </p>
-      </div>
-    </div>
-
     <div class="card">
+      <h1>AI Early Warning System</h1>
+      <p class="muted">Upload a MyLabMath CSV file to identify at-risk students, review intervention suggestions, and download reports.</p>
       <form method="post" action="/analyze" enctype="multipart/form-data">
         <div class="upload-box">
           <strong>Upload MyLabMath CSV</strong><br><br>
