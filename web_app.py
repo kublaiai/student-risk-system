@@ -19,6 +19,7 @@ HTML = """
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Early Warning System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 0; background: #f6f8fb; color: #1f2937; }
     .wrap { max-width: 1200px; margin: 36px auto; padding: 0 20px 40px; }
@@ -61,6 +62,37 @@ HTML = """
     input[type=file] { margin: 10px 0 16px; }
     input[type=text] { padding: 10px; width: 320px; max-width: 100%; margin: 8px 0 16px; border: 1px solid #cbd5e1; border-radius: 10px; }
     .error-box { border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; }
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+    .toolbar input[type=text] { margin: 0; width: 300px; }
+    .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: #eef2ff; color: #3730a3; }
+    .table-wrap { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 12px; margin-top: 12px; }
+    .table-wrap table { margin-top: 0; border: 0; min-width: 900px; }
+    .table-wrap th { position: sticky; top: 0; z-index: 1; }
+    .subtle { color: #475467; font-size: 13px; }
+    .analytics-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; }
+    .panel { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; }
+    .panel h4 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: #475467; }
+    .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; }
+    .kpi { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+    .kpi .kpi-label { font-size: 12px; color: #667085; font-weight: 600; }
+    .kpi .kpi-value { font-size: 22px; font-weight: 800; margin-top: 6px; }
+    .risk-bars { display: grid; gap: 10px; margin-top: 8px; }
+    .risk-line { display: grid; grid-template-columns: 90px 1fr 55px; gap: 10px; align-items: center; font-size: 13px; }
+    .bar-track { background: #e5e7eb; border-radius: 999px; height: 10px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; }
+    .bar-fill.high { background: #ef4444; }
+    .bar-fill.medium { background: #f59e0b; }
+    .bar-fill.low { background: #22c55e; }
+    .table-wrap tr:nth-child(even) td { background: #fcfdff; }
+    .table-wrap td { line-height: 1.45; }
+    .table-wrap th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #475467; }
+    .chart-panel { margin-top: 16px; }
+    .chart-wrap { height: 280px; }
+    @media (max-width: 960px) {
+      .analytics-grid { grid-template-columns: 1fr; }
+      .kpi-row { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .chart-wrap { height: 240px; }
+    }
   </style>
 </head>
 <body>
@@ -134,6 +166,7 @@ HTML = """
     {% if analyzed %}
     <div class="card">
       <h2>Results for {{ filename }}</h2>
+      <p class="muted">Instructor: <strong>{{ instructor_name }}</strong></p>
       <p class="muted">This analysis flags students using overall score, homework average, quiz average when available, and test average.</p>
 
       <div class="summary-grid">
@@ -141,6 +174,59 @@ HTML = """
         <div class="metric high"><span class="label">HIGH RISK</span><span class="value">{{ counts.get('HIGH', 0) }}</span></div>
         <div class="metric medium"><span class="label">MEDIUM RISK</span><span class="value">{{ counts.get('MEDIUM', 0) }}</span></div>
         <div class="metric low"><span class="label">LOW RISK</span><span class="value">{{ counts.get('LOW', 0) }}</span></div>
+      </div>
+
+      <div class="analytics-grid">
+        <div class="panel">
+          <h4>Risk Distribution</h4>
+          <div class="risk-bars">
+            <div class="risk-line">
+              <strong>High</strong>
+              <div class="bar-track"><div class="bar-fill high" style="width: {{ high_pct }}%"></div></div>
+              <span>{{ high_pct }}%</span>
+            </div>
+            <div class="risk-line">
+              <strong>Medium</strong>
+              <div class="bar-track"><div class="bar-fill medium" style="width: {{ medium_pct }}%"></div></div>
+              <span>{{ medium_pct }}%</span>
+            </div>
+            <div class="risk-line">
+              <strong>Low</strong>
+              <div class="bar-track"><div class="bar-fill low" style="width: {{ low_pct }}%"></div></div>
+              <span>{{ low_pct }}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>Class Health Snapshot</h4>
+          <div class="kpi-row">
+            <div class="kpi">
+              <div class="kpi-label">Need Outreach</div>
+              <div class="kpi-value">{{ counts.get('HIGH', 0) + counts.get('MEDIUM', 0) }}</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Avg Risk Score</div>
+              <div class="kpi-value">{{ avg_risk_score }}</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Highest Risk Score</div>
+              <div class="kpi-value">{{ max_risk_score }}</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Top Risk Driver</div>
+              <div class="kpi-value" style="font-size:13px; line-height:1.35;">{{ top_reason }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel chart-panel" id="risk-distribution-panel">
+        <h4>Risk Count Bar Chart</h4>
+        <p class="subtle" style="margin: 0 0 8px;">Distribution of HIGH, MEDIUM, and LOW risk students.</p>
+        <div class="chart-wrap">
+          <canvas id="riskBarChart" aria-label="Risk counts bar chart" role="img"></canvas>
+        </div>
       </div>
 
       <div class="actions">
@@ -153,6 +239,7 @@ HTML = """
       <h3>Instructor Insights</h3>
       <ul class="insight-list">
         <li><strong>Most common high-risk reason:</strong> {{ top_reason }}</li>
+        <li><strong>Main concept gap:</strong> {{ main_concept_gap }}</li>
         <li><strong>Recommended focus:</strong> Reach out first to students with the highest risk scores and lowest test averages.</li>
         <li><strong>Immediate action:</strong> Use the Send Email buttons or download the email drafts file.</li>
       </ul>
@@ -161,14 +248,77 @@ HTML = """
     <div class="card">
       <h3 class="section-title">High Risk Students</h3>
       <div class="small muted"><span class="tag tag-high">HIGH</span>Students needing immediate attention</div>
+      <div class="toolbar">
+        <label for="search-high" class="small"><strong>Search High Risk</strong></label>
+        <input id="search-high" type="text" placeholder="Type name, reason, or action..." oninput="filterTable('high-table', this.value)">
+      </div>
       {{ high_table|safe }}
 
       <h3 class="section-title">Medium Risk Students</h3>
       <div class="small muted"><span class="tag tag-medium">MEDIUM</span>Students showing warning signs</div>
+      <div class="toolbar">
+        <label for="search-medium" class="small"><strong>Search Medium Risk</strong></label>
+        <input id="search-medium" type="text" placeholder="Type name, reason, or action..." oninput="filterTable('medium-table', this.value)">
+      </div>
       {{ medium_table|safe }}
     </div>
     {% endif %}
   </div>
+  <script>
+    function filterTable(tableId, query) {
+      const table = document.getElementById(tableId);
+      if (!table) return;
+      const q = (query || '').toLowerCase().trim();
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = (!q || text.includes(q)) ? '' : 'none';
+      });
+    }
+
+    {% if analyzed %}
+    (function renderRiskChart() {
+      const canvas = document.getElementById('riskBarChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+
+      const labels = ['High', 'Medium', 'Low'];
+      const values = [{{ counts.get('HIGH', 0) }}, {{ counts.get('MEDIUM', 0) }}, {{ counts.get('LOW', 0) }}];
+
+      new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Students',
+            data: values,
+            backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
+            borderColor: ['#b91c1c', '#b45309', '#15803d'],
+            borderWidth: 1.2,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 },
+              title: { display: true, text: 'Number of Students' }
+            },
+            x: {
+              title: { display: true, text: 'Risk Level' }
+            }
+          }
+        }
+      });
+    })();
+    {% endif %}
+  </script>
 </body>
 </html>
 """
@@ -290,6 +440,27 @@ def process_mylab_csv(file_stream, instructor_name):
 
     return df
 
+
+def identify_main_concept_gap(df):
+    category_map = {
+        "Homework_Avg": "Homework",
+        "Quiz_Avg": "Quiz",
+        "Test_Avg": "Test",
+    }
+
+    means = {}
+    for col, label in category_map.items():
+        if col in df.columns:
+            series = pd.to_numeric(df[col], errors="coerce")
+            if series.notna().any():
+                means[label] = float(series.mean())
+
+    if not means:
+        return "Insufficient assessment data to determine a concept gap"
+
+    lowest_category = min(means, key=means.get)
+    return f"{lowest_category} is the lowest performing assessment category (avg {means[lowest_category]:.1f})"
+
 def most_common_reason(df):
     flagged = df[df["Risk_Level"] != "LOW"]
     if flagged.empty:
@@ -304,7 +475,7 @@ def most_common_reason(df):
 
     return pd.Series(all_reasons).value_counts().index[0]
 
-def build_display_table(df, level):
+def build_display_table(df, level, table_id):
     filtered = df[df["Risk_Level"] == level].copy()
     if filtered.empty:
         return f"<p class='muted'>No {level.lower()}-risk students found.</p>"
@@ -320,7 +491,8 @@ def build_display_table(df, level):
     ]
 
     filtered = filtered[display_cols].sort_values(by="Risk_Score", ascending=False)
-    return filtered.to_html(index=False, escape=False, classes="small")
+    table_html = filtered.to_html(index=False, escape=False, classes="small", table_id=table_id)
+    return f"<div class='table-wrap'>{table_html}</div>"
 
 @app.route("/", methods=["GET"])
 def home():
@@ -362,15 +534,31 @@ def analyze():
 
         LAST_EMAIL_DF = LAST_EMAIL_DF.rename(columns={"Draft_Email": "Email_Draft"})
 
+        total_students = len(df)
+        high_count = int(LAST_COUNTS.get("HIGH", 0))
+        medium_count = int(LAST_COUNTS.get("MEDIUM", 0))
+        low_count = int(LAST_COUNTS.get("LOW", 0))
+
+        high_pct = round((high_count / total_students) * 100) if total_students else 0
+        medium_pct = round((medium_count / total_students) * 100) if total_students else 0
+        low_pct = round((low_count / total_students) * 100) if total_students else 0
+
         return render_template_string(
             HTML,
             analyzed=True,
             filename=LAST_FILENAME,
             counts=LAST_COUNTS,
-            total_students=len(df),
+            total_students=total_students,
             top_reason=most_common_reason(df),
-            high_table=build_display_table(df, "HIGH"),
-            medium_table=build_display_table(df, "MEDIUM"),
+            main_concept_gap=identify_main_concept_gap(df),
+            high_table=build_display_table(df, "HIGH", "high-table"),
+            medium_table=build_display_table(df, "MEDIUM", "medium-table"),
+            instructor_name=LAST_INSTRUCTOR_NAME,
+            high_pct=high_pct,
+            medium_pct=medium_pct,
+            low_pct=low_pct,
+            avg_risk_score=round(float(df["Risk_Score"].mean()), 1) if not df.empty else 0,
+            max_risk_score=int(df["Risk_Score"].max()) if not df.empty else 0,
             error_message=None,
         )
 
@@ -422,4 +610,7 @@ def download_emails():
     )
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # Render provides PORT at runtime. Fallback keeps local runs simple.
+    port = int(os.environ.get("PORT", 5000))
+    # Bind to all interfaces for container/platform deployments.
+    app.run(host="0.0.0.0", port=port, debug=False)
