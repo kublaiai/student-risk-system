@@ -11,6 +11,12 @@ LAST_EMAIL_DF = None
 LAST_FILENAME = None
 LAST_COUNTS = None
 LAST_INSTRUCTOR_NAME = "Your Instructor"
+LAST_WEIGHTS = {
+    "homework": 25.0,
+    "quiz": 20.0,
+    "test": 45.0,
+    "other": 10.0,
+}
 
 HTML = """
 <!doctype html>
@@ -60,7 +66,7 @@ HTML = """
     .tag-medium { background: #fef3c7; color: #92400e; }
     .small { font-size: 13px; }
     input[type=file] { margin: 10px 0 16px; }
-    input[type=text] { padding: 10px; width: 320px; max-width: 100%; margin: 8px 0 16px; border: 1px solid #cbd5e1; border-radius: 10px; }
+    input[type=text], input[type=number] { padding: 10px; width: 320px; max-width: 100%; margin: 8px 0 16px; border: 1px solid #cbd5e1; border-radius: 10px; }
     .error-box { border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; }
     .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
     .toolbar input[type=text] { margin: 0; width: 300px; }
@@ -88,6 +94,9 @@ HTML = """
     .table-wrap th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #475467; }
     .chart-panel { margin-top: 16px; }
     .chart-wrap { height: 280px; }
+    .weights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 8px 0 4px; }
+    .weights-grid label { font-size: 13px; font-weight: 700; color: #334155; }
+    .weights-grid input[type=number] { width: 100%; margin-top: 6px; margin-bottom: 0; }
     @media (max-width: 960px) {
       .analytics-grid { grid-template-columns: 1fr; }
       .kpi-row { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
@@ -154,8 +163,29 @@ HTML = """
         <div class="upload-box">
           <strong>Upload MyLabMath CSV</strong><br><br>
           <label for="instructor_name"><strong>Instructor Name</strong></label><br>
-          <input type="text" name="instructor_name" id="instructor_name" placeholder="Enter instructor name" required>
-          <br>
+          <input type="text" name="instructor_name" id="instructor_name" placeholder="Enter instructor name" value="{{ instructor_name if instructor_name else '' }}" required>
+
+          <label><strong>Custom Grade Weights (must total 100%)</strong></label>
+          <div class="weights-grid">
+            <div>
+              <label for="weight_homework">Homework (%)</label>
+              <input type="number" step="0.1" min="0" max="100" name="weight_homework" id="weight_homework" value="{{ weights.homework }}" required>
+            </div>
+            <div>
+              <label for="weight_quiz">Quiz (%)</label>
+              <input type="number" step="0.1" min="0" max="100" name="weight_quiz" id="weight_quiz" value="{{ weights.quiz }}" required>
+            </div>
+            <div>
+              <label for="weight_test">Test (%)</label>
+              <input type="number" step="0.1" min="0" max="100" name="weight_test" id="weight_test" value="{{ weights.test }}" required>
+            </div>
+            <div>
+              <label for="weight_other">Other (%)</label>
+              <input type="number" step="0.1" min="0" max="100" name="weight_other" id="weight_other" value="{{ weights.other }}" required>
+            </div>
+          </div>
+          <p class="subtle" style="margin: 6px 0 12px;">These weights affect weighted grade analytics only and do not change the existing risk trigger logic.</p>
+
           <input type="file" name="file" accept=".csv" required>
           <br>
           <button class="btn" type="submit">Analyze Student Risk</button>
@@ -168,6 +198,7 @@ HTML = """
       <h2>Results for {{ filename }}</h2>
       <p class="muted">Instructor: <strong>{{ instructor_name }}</strong></p>
       <p class="muted">This analysis flags students using overall score, homework average, quiz average when available, and test average.</p>
+      <p class="muted">Weighted grade setup — Homework: <strong>{{ weights.homework }}%</strong>, Quiz: <strong>{{ weights.quiz }}%</strong>, Test: <strong>{{ weights.test }}%</strong>, Other: <strong>{{ weights.other }}%</strong>.</p>
 
       <div class="summary-grid">
         <div class="metric total"><span class="label">TOTAL STUDENTS</span><span class="value">{{ total_students }}</span></div>
@@ -240,6 +271,7 @@ HTML = """
       <ul class="insight-list">
         <li><strong>Most common high-risk reason:</strong> {{ top_reason }}</li>
         <li><strong>Main concept gap:</strong> {{ main_concept_gap }}</li>
+        <li><strong>Class weighted grade average:</strong> {{ class_weighted_avg }}%</li>
         <li><strong>Recommended focus:</strong> Reach out first to students with the highest risk scores and lowest test averages.</li>
         <li><strong>Immediate action:</strong> Use the Send Email buttons or download the email drafts file.</li>
       </ul>
@@ -378,6 +410,48 @@ Best regards,
 def build_mailto(email, subject, body):
     return f"mailto:{quote(str(email))}?subject={quote(subject)}&body={quote(body)}"
 
+def parse_grading_weights(form_data):
+    weights = {
+        "homework": float(form_data.get("weight_homework", LAST_WEIGHTS["homework"])),
+        "quiz": float(form_data.get("weight_quiz", LAST_WEIGHTS["quiz"])),
+        "test": float(form_data.get("weight_test", LAST_WEIGHTS["test"])),
+        "other": float(form_data.get("weight_other", LAST_WEIGHTS["other"])),
+    }
+
+    for label, value in weights.items():
+        if value < 0:
+            raise ValueError(f"{label.title()} weight cannot be negative.")
+
+    total = round(sum(weights.values()), 2)
+    if abs(total - 100.0) > 0.01:
+        raise ValueError(f"Grading weights must total 100%. Current total: {total}%.")
+
+    return weights
+
+def calculate_weighted_grade(row, df, weights):
+    mapping = {
+        "homework": "Homework_Avg",
+        "quiz": "Quiz_Avg",
+        "test": "Test_Avg",
+        "other": "Other_Avg",
+    }
+
+    weighted_sum = 0.0
+    active_weight = 0.0
+
+    for key, col in mapping.items():
+        weight = float(weights.get(key, 0.0))
+        if weight <= 0:
+            continue
+        if col in df.columns and pd.notna(row.get(col)):
+            weighted_sum += float(row[col]) * weight
+            active_weight += weight
+
+    if active_weight == 0:
+        return pd.NA
+
+    return round(weighted_sum / active_weight, 2)
+
 def calculate_risk_score(row, df):
     score = 0
     reasons = []
@@ -404,7 +478,7 @@ def calculate_risk_score(row, df):
 
     return pd.Series([score, "; ".join(reasons)])
 
-def process_mylab_csv(file_stream, instructor_name):
+def process_mylab_csv(file_stream, instructor_name, weights):
     df = pd.read_csv(file_stream, header=2)
 
     if len(df.columns) == 12:
@@ -429,11 +503,12 @@ def process_mylab_csv(file_stream, instructor_name):
     df = df[~df["Last_Name"].astype(str).str.contains("Inactive", case=False, na=False)]
     df = df.dropna(how="all").reset_index(drop=True)
 
-    for col in ["Overall_Score", "Homework_Avg", "Quiz_Avg", "Test_Avg"]:
+    for col in ["Overall_Score", "Homework_Avg", "Quiz_Avg", "Test_Avg", "Other_Avg"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df[["Risk_Score", "Risk_Reasons"]] = df.apply(lambda row: calculate_risk_score(row, df), axis=1)
+    df["Weighted_Grade"] = df.apply(lambda row: calculate_weighted_grade(row, df, weights), axis=1)
     df["Risk_Level"] = df["Risk_Score"].apply(risk_level)
     df["Intervention"] = df.apply(intervention_action, axis=1)
     df["Draft_Email"] = df.apply(lambda row: draft_email(row, instructor_name), axis=1)
@@ -486,7 +561,7 @@ def build_display_table(df, level, table_id):
     )
 
     display_cols = [
-        "First_Name", "Last_Name", "Risk_Score",
+        "First_Name", "Last_Name", "Weighted_Grade", "Risk_Score",
         "Risk_Reasons", "Intervention", "Email_Action"
     ]
 
@@ -496,11 +571,17 @@ def build_display_table(df, level, table_id):
 
 @app.route("/", methods=["GET"])
 def home():
-    return render_template_string(HTML, analyzed=False, error_message=None)
+    return render_template_string(
+        HTML,
+        analyzed=False,
+        error_message=None,
+        instructor_name="",
+        weights=LAST_WEIGHTS,
+    )
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_INSTRUCTOR_NAME
+    global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_INSTRUCTOR_NAME, LAST_WEIGHTS
 
     uploaded = request.files.get("file")
     instructor_name = request.form.get("instructor_name", "").strip()
@@ -510,21 +591,35 @@ def analyze():
 
     LAST_INSTRUCTOR_NAME = instructor_name
 
+    try:
+        selected_weights = parse_grading_weights(request.form)
+    except ValueError as e:
+        return render_template_string(
+            HTML,
+            analyzed=False,
+            error_message=str(e),
+            instructor_name=LAST_INSTRUCTOR_NAME,
+            weights=LAST_WEIGHTS,
+        ), 400
+
     if not uploaded or uploaded.filename == "":
         return render_template_string(
             HTML,
             analyzed=False,
-            error_message="Please upload a CSV file."
+            error_message="Please upload a CSV file.",
+            instructor_name=LAST_INSTRUCTOR_NAME,
+            weights=selected_weights,
         )
 
     try:
-        df = process_mylab_csv(uploaded, LAST_INSTRUCTOR_NAME)
+        LAST_WEIGHTS = selected_weights
+        df = process_mylab_csv(uploaded, LAST_INSTRUCTOR_NAME, LAST_WEIGHTS)
         LAST_FILENAME = uploaded.filename
         LAST_COUNTS = df["Risk_Level"].value_counts().to_dict()
 
         LAST_REPORT_DF = df[df["Risk_Level"] != "LOW"][
             ["Last_Name", "First_Name", "Email", "Overall_Score", "Homework_Avg",
-             "Quiz_Avg", "Test_Avg", "Risk_Score", "Risk_Level", "Risk_Reasons",
+             "Quiz_Avg", "Test_Avg", "Other_Avg", "Weighted_Grade", "Risk_Score", "Risk_Level", "Risk_Reasons",
              "Intervention"]
         ].copy()
 
@@ -559,6 +654,8 @@ def analyze():
             low_pct=low_pct,
             avg_risk_score=round(float(df["Risk_Score"].mean()), 1) if not df.empty else 0,
             max_risk_score=int(df["Risk_Score"].max()) if not df.empty else 0,
+            class_weighted_avg=round(float(pd.to_numeric(df["Weighted_Grade"], errors="coerce").mean()), 1) if not df.empty else 0,
+            weights=LAST_WEIGHTS,
             error_message=None,
         )
 
@@ -570,7 +667,9 @@ def analyze():
                 "Unable to process this file. Please make sure you uploaded the "
                 "MyLabMath 'Overview of Student Averages' export saved as CSV. "
                 f"Technical error: {str(e)}"
-            )
+            ),
+            instructor_name=LAST_INSTRUCTOR_NAME,
+            weights=selected_weights,
         ), 400
 
 @app.route("/download-report", methods=["GET"])
