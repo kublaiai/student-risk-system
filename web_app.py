@@ -12,9 +12,9 @@ LAST_FILENAME = None
 LAST_COUNTS = None
 LAST_INSTRUCTOR_NAME = "Your Instructor"
 LAST_WEIGHTS = {
-    "homework": 25.0,
-    "quiz": 20.0,
-    "test": 45.0,
+    "homework": 20.0,
+    "quiz": 10.0,
+    "test": 60.0,
     "other": 10.0,
 }
 
@@ -130,6 +130,7 @@ HTML = """
         <h3>How to Use This Tool</h3>
         <ol>
           <li>Enter your <strong>Instructor Name</strong>.</li>
+          <li>Set course <strong>assessment weights</strong>.</li>
           <li>Upload the MyLabMath <strong>CSV</strong> file.</li>
           <li>Click <strong>Analyze Student Risk</strong>.</li>
           <li>Review flagged students, download reports, or send emails.</li>
@@ -140,10 +141,11 @@ HTML = """
         <h3>How Risk Is Calculated</h3>
         <table class="risk-mini-table">
           <tr><th>Indicator</th><th>Risk Trigger</th></tr>
-          <tr><td>Overall Score</td><td>Below 70</td></tr>
+          <tr><td>Overall Score</td><td>Below 70 (universal indicator)</td></tr>
           <tr><td>Homework Average</td><td>Below 70</td></tr>
           <tr><td>Quiz Average</td><td>Below 65</td></tr>
           <tr><td>Test Average</td><td>Below 65</td></tr>
+          <tr><td>Other Average</td><td>Below 70</td></tr>
         </table>
         <p class="small muted" style="margin-top:10px;">
           Risk levels: <strong>0–2 = Low</strong>, <strong>3–5 = Medium</strong>, <strong>6+ = High</strong>.
@@ -165,26 +167,27 @@ HTML = """
           <label for="instructor_name"><strong>Instructor Name</strong></label><br>
           <input type="text" name="instructor_name" id="instructor_name" placeholder="Enter instructor name" value="{{ instructor_name if instructor_name else '' }}" required>
 
-          <label><strong>Custom Grade Weights (must total 100%)</strong></label>
+          <label><strong>Custom Course Weights (must total 100%)</strong></label>
           <div class="weights-grid">
             <div>
-              <label for="weight_homework">Homework (%)</label>
+              <label for="weight_homework">Homework Weight (%)</label>
               <input type="number" step="0.1" min="0" max="100" name="weight_homework" id="weight_homework" value="{{ weights.homework }}" required>
             </div>
             <div>
-              <label for="weight_quiz">Quiz (%)</label>
+              <label for="weight_quiz">Quiz Weight (%)</label>
               <input type="number" step="0.1" min="0" max="100" name="weight_quiz" id="weight_quiz" value="{{ weights.quiz }}" required>
             </div>
             <div>
-              <label for="weight_test">Test (%)</label>
+              <label for="weight_test">Test Weight (%)</label>
               <input type="number" step="0.1" min="0" max="100" name="weight_test" id="weight_test" value="{{ weights.test }}" required>
             </div>
             <div>
-              <label for="weight_other">Other (%)</label>
+              <label for="weight_other">Other Weight (%)</label>
               <input type="number" step="0.1" min="0" max="100" name="weight_other" id="weight_other" value="{{ weights.other }}" required>
             </div>
           </div>
-          <p class="subtle" style="margin: 6px 0 12px;">These weights affect weighted grade analytics only and do not change the existing risk trigger logic.</p>
+          <p class="subtle" style="margin: 6px 0 6px;">Overall Score remains a universal risk indicator and does not require a custom weight.</p>
+          <p class="subtle" style="margin: 0 0 12px;">If a category has no grades yet, it is excluded from the weighted calculation and the remaining weights are normalized automatically.</p>
 
           <input type="file" name="file" accept=".csv" required>
           <br>
@@ -197,8 +200,8 @@ HTML = """
     <div class="card">
       <h2>Results for {{ filename }}</h2>
       <p class="muted">Instructor: <strong>{{ instructor_name }}</strong></p>
-      <p class="muted">This analysis flags students using overall score, homework average, quiz average when available, and test average.</p>
-      <p class="muted">Weighted grade setup — Homework: <strong>{{ weights.homework }}%</strong>, Quiz: <strong>{{ weights.quiz }}%</strong>, Test: <strong>{{ weights.test }}%</strong>, Other: <strong>{{ weights.other }}%</strong>.</p>
+      <p class="muted">This analysis flags students using overall score, homework average, quiz average when available, test average, and other average.</p>
+      <p class="muted">Course weights — Homework: <strong>{{ weights.homework }}%</strong>, Quiz: <strong>{{ weights.quiz }}%</strong>, Test: <strong>{{ weights.test }}%</strong>, Other: <strong>{{ weights.other }}%</strong>.</p>
 
       <div class="summary-grid">
         <div class="metric total"><span class="label">TOTAL STUDENTS</span><span class="value">{{ total_students }}</span></div>
@@ -293,6 +296,14 @@ HTML = """
         <input id="search-medium" type="text" placeholder="Type name, reason, or action..." oninput="filterTable('medium-table', this.value)">
       </div>
       {{ medium_table|safe }}
+
+      <h3 class="section-title">Students Doing Well</h3>
+      <div class="small muted"><span class="pill">Recognition</span>LOW-risk students with strong overall or weighted performance (85+)</div>
+      <div class="toolbar">
+        <label for="search-positive" class="small"><strong>Search Recognized Students</strong></label>
+        <input id="search-positive" type="text" placeholder="Type name or score..." oninput="filterTable('positive-table', this.value)">
+      </div>
+      {{ positive_table|safe }}
     </div>
     {% endif %}
   </div>
@@ -407,16 +418,30 @@ Best regards,
 """
     return ""
 
+def draft_encouragement_email(row, instructor_name):
+    return f"""Subject: Great Progress in the Course
+
+Hi {row['First_Name']},
+
+You are doing a great job in the course so far. Keep up the strong work and continue the study habits that are helping you succeed.
+
+Best regards,
+{instructor_name}
+"""
+
 def build_mailto(email, subject, body):
     return f"mailto:{quote(str(email))}?subject={quote(subject)}&body={quote(body)}"
 
 def parse_grading_weights(form_data):
-    weights = {
-        "homework": float(form_data.get("weight_homework", LAST_WEIGHTS["homework"])),
-        "quiz": float(form_data.get("weight_quiz", LAST_WEIGHTS["quiz"])),
-        "test": float(form_data.get("weight_test", LAST_WEIGHTS["test"])),
-        "other": float(form_data.get("weight_other", LAST_WEIGHTS["other"])),
-    }
+    try:
+        weights = {
+            "homework": float(form_data.get("weight_homework", LAST_WEIGHTS["homework"])),
+            "quiz": float(form_data.get("weight_quiz", LAST_WEIGHTS["quiz"])),
+            "test": float(form_data.get("weight_test", LAST_WEIGHTS["test"])),
+            "other": float(form_data.get("weight_other", LAST_WEIGHTS["other"])),
+        }
+    except ValueError:
+        raise ValueError("Please enter valid numeric values for all four weights.")
 
     for label, value in weights.items():
         if value < 0:
@@ -424,11 +449,11 @@ def parse_grading_weights(form_data):
 
     total = round(sum(weights.values()), 2)
     if abs(total - 100.0) > 0.01:
-        raise ValueError(f"Grading weights must total 100%. Current total: {total}%.")
+        raise ValueError(f"Your weights currently add to {total}%. Please adjust them so they total 100%.")
 
     return weights
 
-def calculate_weighted_grade(row, df, weights):
+def get_active_normalized_weights(row, df, weights):
     mapping = {
         "homework": "Homework_Avg",
         "quiz": "Quiz_Avg",
@@ -436,47 +461,68 @@ def calculate_weighted_grade(row, df, weights):
         "other": "Other_Avg",
     }
 
-    weighted_sum = 0.0
-    active_weight = 0.0
-
+    active_raw_weights = {}
     for key, col in mapping.items():
         weight = float(weights.get(key, 0.0))
         if weight <= 0:
             continue
         if col in df.columns and pd.notna(row.get(col)):
-            weighted_sum += float(row[col]) * weight
-            active_weight += weight
+            active_raw_weights[key] = weight
 
-    if active_weight == 0:
+    total_active_weight = sum(active_raw_weights.values())
+    if total_active_weight <= 0:
+        return {}, mapping
+
+    normalized = {
+        key: (value / total_active_weight)
+        for key, value in active_raw_weights.items()
+    }
+    return normalized, mapping
+
+def calculate_weighted_grade(row, df, weights):
+    normalized_weights, mapping = get_active_normalized_weights(row, df, weights)
+    if not normalized_weights:
         return pd.NA
 
-    return round(weighted_sum / active_weight, 2)
+    weighted_sum = 0.0
+    for key, normalized_weight in normalized_weights.items():
+        col = mapping[key]
+        weighted_sum += float(row[col]) * normalized_weight
 
-def calculate_risk_score(row, df):
-    score = 0
+    return round(weighted_sum, 2)
+
+def calculate_risk_score(row, df, weights):
+    score = 0.0
     reasons = []
 
     if usable_column(df, "Overall_Score") and pd.notna(row["Overall_Score"]):
         if row["Overall_Score"] < 70:
-            score += 3
+            score += 3.0
             reasons.append("overall score below 70")
 
-    if usable_column(df, "Homework_Avg") and pd.notna(row["Homework_Avg"]):
-        if row["Homework_Avg"] < 70:
-            score += 2
-            reasons.append("homework average below 70")
+    normalized_weights, _ = get_active_normalized_weights(row, df, weights)
 
-    if usable_column(df, "Quiz_Avg") and pd.notna(row["Quiz_Avg"]):
-        if row["Quiz_Avg"] < 65:
-            score += 1
-            reasons.append("quiz average below 65")
+    category_rules = [
+        ("homework", "Homework_Avg", 70, "homework average below 70"),
+        ("quiz", "Quiz_Avg", 65, "quiz average below 65"),
+        ("test", "Test_Avg", 65, "test average below 65"),
+        ("other", "Other_Avg", 70, "other average below 70"),
+    ]
 
-    if usable_column(df, "Test_Avg") and pd.notna(row["Test_Avg"]):
-        if row["Test_Avg"] < 65:
-            score += 3
-            reasons.append("test average below 65")
+    # Category-related risk points contribute up to 5 total, scaled by normalized active weights.
+    category_risk_budget = 5.0
 
-    return pd.Series([score, "; ".join(reasons)])
+    for key, col, threshold, reason in category_rules:
+        if key not in normalized_weights:
+            continue
+        if row[col] < threshold:
+            pts = round(normalized_weights[key] * category_risk_budget, 2)
+            score += pts
+            reasons.append(
+                f"{reason} (normalized weight {round(normalized_weights[key] * 100, 1)}%)"
+            )
+
+    return pd.Series([round(score, 2), "; ".join(reasons)])
 
 def process_mylab_csv(file_stream, instructor_name, weights):
     df = pd.read_csv(file_stream, header=2)
@@ -507,11 +553,12 @@ def process_mylab_csv(file_stream, instructor_name, weights):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    df[["Risk_Score", "Risk_Reasons"]] = df.apply(lambda row: calculate_risk_score(row, df), axis=1)
+    df[["Risk_Score", "Risk_Reasons"]] = df.apply(lambda row: calculate_risk_score(row, df, weights), axis=1)
     df["Weighted_Grade"] = df.apply(lambda row: calculate_weighted_grade(row, df, weights), axis=1)
     df["Risk_Level"] = df["Risk_Score"].apply(risk_level)
     df["Intervention"] = df.apply(intervention_action, axis=1)
     df["Draft_Email"] = df.apply(lambda row: draft_email(row, instructor_name), axis=1)
+    df["Encouragement_Email"] = df.apply(lambda row: draft_encouragement_email(row, instructor_name), axis=1)
 
     return df
 
@@ -521,6 +568,7 @@ def identify_main_concept_gap(df):
         "Homework_Avg": "Homework",
         "Quiz_Avg": "Quiz",
         "Test_Avg": "Test",
+        "Other_Avg": "Other",
     }
 
     means = {}
@@ -567,6 +615,31 @@ def build_display_table(df, level, table_id):
 
     filtered = filtered[display_cols].sort_values(by="Risk_Score", ascending=False)
     table_html = filtered.to_html(index=False, escape=False, classes="small", table_id=table_id)
+    return f"<div class='table-wrap'>{table_html}</div>"
+
+def build_positive_recognition_table(df, table_id):
+    recognized = df[
+        (df["Risk_Level"] == "LOW") &
+        (
+            (pd.to_numeric(df["Overall_Score"], errors="coerce") >= 85) |
+            (pd.to_numeric(df["Weighted_Grade"], errors="coerce") >= 85)
+        )
+    ].copy()
+
+    if recognized.empty:
+        return "<p class='muted'>No students currently meet the recognition criteria.</p>"
+
+    recognized["Encouragement_Action"] = recognized.apply(
+        lambda row: f'<a class="btn mail" href="{build_mailto(row["Email"], "Great Progress in the Course", row["Encouragement_Email"])}">Send Encouragement</a>',
+        axis=1
+    )
+
+    display_cols = [
+        "First_Name", "Last_Name", "Overall_Score", "Weighted_Grade", "Encouragement_Action"
+    ]
+
+    recognized = recognized[display_cols].sort_values(by=["Weighted_Grade", "Overall_Score"], ascending=False)
+    table_html = recognized.to_html(index=False, escape=False, classes="small", table_id=table_id)
     return f"<div class='table-wrap'>{table_html}</div>"
 
 @app.route("/", methods=["GET"])
@@ -648,12 +721,13 @@ def analyze():
             main_concept_gap=identify_main_concept_gap(df),
             high_table=build_display_table(df, "HIGH", "high-table"),
             medium_table=build_display_table(df, "MEDIUM", "medium-table"),
+            positive_table=build_positive_recognition_table(df, "positive-table"),
             instructor_name=LAST_INSTRUCTOR_NAME,
             high_pct=high_pct,
             medium_pct=medium_pct,
             low_pct=low_pct,
             avg_risk_score=round(float(df["Risk_Score"].mean()), 1) if not df.empty else 0,
-            max_risk_score=int(df["Risk_Score"].max()) if not df.empty else 0,
+            max_risk_score=round(float(df["Risk_Score"].max()), 1) if not df.empty else 0,
             class_weighted_avg=round(float(pd.to_numeric(df["Weighted_Grade"], errors="coerce").mean()), 1) if not df.empty else 0,
             weights=LAST_WEIGHTS,
             error_message=None,
@@ -711,5 +785,9 @@ def download_emails():
 if __name__ == "__main__":
     # Render provides PORT at runtime. Fallback keeps local runs simple.
     port = int(os.environ.get("PORT", 5000))
+    # Enable auto-reload for local development unless explicitly disabled.
+    auto_reload = os.environ.get("AUTO_RELOAD", "1") == "1"
+    # Keep production behavior stable unless DEBUG is explicitly enabled.
+    debug_mode = os.environ.get("DEBUG", "0") == "1"
     # Bind to all interfaces for container/platform deployments.
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=debug_mode, use_reloader=auto_reload)
