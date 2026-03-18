@@ -652,6 +652,10 @@ def home():
         weights=LAST_WEIGHTS,
     )
 
+@app.route("/health", methods=["GET"])
+def health():
+    return "ok", 200
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_INSTRUCTOR_NAME, LAST_WEIGHTS
@@ -781,6 +785,9 @@ def download_emails():
         as_attachment=True,
         download_name=f"{base}_email_drafts.csv",
     )
+
+# WSGI entrypoint for Gunicorn
+application = app
 
 if __name__ == "__main__":
     # Render provides PORT at runtime. Fallback keeps local runs simple.
