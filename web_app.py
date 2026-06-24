@@ -62,15 +62,19 @@ HTML = """
     .info-box { background: white; border-radius: 18px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,.05); }
     .info-box h3 { margin-bottom: 14px; font-size: 18px; color: #1E3A5F; }
     .info-box ol, .info-box ul { margin: 0; padding-left: 18px; line-height: 1.9; color: #334155; }
-    .risk-chip-list { display: flex; flex-wrap: wrap; gap: 10px; }
+    .section-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin: 0 0 14px; }
+    .risk-chip-list { display: grid; gap: 12px; }
+    .risk-level-item { display: grid; gap: 6px; }
     .risk-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
     .risk-badge.on-track { background: #dcfce7; color: #166534; }
     .risk-badge.needs { background: #e0f2fe; color: #075985; }
     .risk-badge.at-risk { background: #fef3c7; color: #92400e; }
     .risk-badge.high { background: #fee2e2; color: #991b1b; }
+    .risk-description { font-size: 14px; color: #56697d; line-height: 1.5; }
     .workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-    .workflow-card { min-height: 240px; display: flex; flex-direction: column; justify-content: space-between; }
-    .workflow-card p { line-height: 1.75; margin-bottom: 22px; }
+    .workflow-card { min-height: 210px; display: flex; flex-direction: column; justify-content: space-between; }
+    .workflow-card h3 { margin-bottom: 10px; }
+    .workflow-card p { line-height: 1.65; margin: 0 0 16px; }
     @media (max-width: 960px) {
       .hero h1 { font-size: 34px; }
       .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -118,18 +122,19 @@ HTML = """
     </div>
 
     <div class="card">
+      <div class="section-label">Choose a Gradebook Source</div>
       <div class="workflow-grid">
         <div class="info-box workflow-card">
           <div>
-          <h3>MyLabMath Gradebook Upload</h3>
-          <p class="muted">Upload student averages, confirm assessment weights, and generate a student success report.</p>
+          <h3>Analyze MyLabMath Gradebook</h3>
+          <p class="muted">Upload the MyLabMath Overview of Student Averages CSV file, confirm assessment weights, and generate a student success report.</p>
           </div>
           <a class="btn" href="/mylab-upload">Analyze MyLabMath Gradebook</a>
         </div>
         <div class="info-box workflow-card">
           <div>
-          <h3>Canvas Gradebook Upload</h3>
-          <p class="muted">Upload a Canvas gradebook export, auto-detect categories, and generate intervention recommendations.</p>
+          <h3>Analyze Canvas Gradebook</h3>
+          <p class="muted">Upload a Canvas Gradebook CSV export, auto-detect categories, and generate intervention recommendations.</p>
           </div>
           <a class="btn secondary" href="/canvas-upload">Analyze Canvas Gradebook</a>
         </div>
@@ -162,10 +167,22 @@ HTML = """
       <div class="info-box">
         <h3>Academic Risk Levels</h3>
         <div class="risk-chip-list">
-          <span class="risk-badge on-track">🟢 On Track</span>
-          <span class="risk-badge needs">🔵 Needs Attention</span>
-          <span class="risk-badge at-risk">🟡 At Risk</span>
-          <span class="risk-badge high">🔴 High Risk</span>
+          <div class="risk-level-item">
+            <span class="risk-badge on-track">🟢 On Track</span>
+            <div class="risk-description">Meeting course expectations</div>
+          </div>
+          <div class="risk-level-item">
+            <span class="risk-badge needs">🔵 Needs Attention</span>
+            <div class="risk-description">Monitor progress and provide support</div>
+          </div>
+          <div class="risk-level-item">
+            <span class="risk-badge at-risk">🟡 At Risk</span>
+            <div class="risk-description">Outreach recommended</div>
+          </div>
+          <div class="risk-level-item">
+            <span class="risk-badge high">🔴 High Risk</span>
+            <div class="risk-description">Immediate intervention recommended</div>
+          </div>
         </div>
       </div>
     </div>
@@ -221,7 +238,7 @@ MYLAB_UPLOAD_HTML = """
   <div class="wrap">
     <div class="card hero">
       <h1>MyLabMath Gradebook Upload</h1>
-      <p class="muted">Upload the MyLabMath export, review the detected categories, confirm the course weights from your syllabus, and generate the early warning report.</p>
+      <p class="muted">Upload the MyLabMath Overview of Student Averages CSV file, review the detected categories, confirm the course weights from your syllabus, and generate the early warning report.</p>
       <div style="margin-top:16px;">
         <a class="btn light" href="/">Back to Home</a>
       </div>
@@ -239,6 +256,8 @@ MYLAB_UPLOAD_HTML = """
       <div class="step-card" style="margin-top:0;">
         <div class="step-label">Step 1</div>
         <h2>Upload MyLabMath CSV</h2>
+        <p class="subtle" style="margin-top:0;">Please upload a CSV file.</p>
+        <p class="subtle" style="margin-top:0;">Export the Overview of Student Averages from MyLabMath as a CSV file.</p>
         <form method="post" action="/mylab-upload" enctype="multipart/form-data">
           <div class="upload-box">
             <label for="instructor_name"><strong>Instructor Name</strong></label><br>
@@ -627,7 +646,7 @@ CANVAS_UPLOAD_HTML = """
   <div class="wrap">
     <div class="card hero">
       <h1>Canvas Gradebook Upload</h1>
-      <p class="muted">Canvas exports vary by course, so this workflow keeps the instructor in control: upload the CSV, confirm the header row, map the columns, and then generate the same early-warning dashboard.</p>
+      <p class="muted">Canvas exports vary by course, so this workflow keeps the instructor in control: upload the Canvas Gradebook CSV file, confirm the header row, map the columns, and then generate the same early-warning dashboard.</p>
       <div style="margin-top:16px;">
         <a class="btn light" href="/">Back to Home</a>
       </div>
@@ -642,6 +661,8 @@ CANVAS_UPLOAD_HTML = """
 
     {% if not mapping_ready %}
     <div class="card">
+      <p class="subtle" style="margin-top:0;">Please upload a CSV file.</p>
+      <p class="subtle" style="margin-top:0;">Export the Canvas Gradebook as a CSV file.</p>
       <form method="post" action="/canvas-upload" enctype="multipart/form-data">
         <div class="upload-box">
           <strong>Upload Canvas Gradebook CSV</strong><br><br>
@@ -1485,6 +1506,13 @@ def render_mylab_upload(error_message=None, upload_ready=False, **kwargs):
     }
     defaults.update(kwargs)
     return render_template_string(MYLAB_UPLOAD_HTML, **defaults)
+
+
+def validate_csv_filename(filename):
+    if not filename or not filename.lower().endswith(".csv"):
+        raise ValueError(
+            "This tool only accepts CSV files. Please export your gradebook as a CSV file and upload it again."
+        )
 
 
 def parse_grading_weights(form_data):
@@ -2367,6 +2395,7 @@ def mylab_upload():
         uploaded = request.files.get("file")
         if not uploaded or uploaded.filename == "":
             raise ValueError("Please upload a MyLabMath CSV file.")
+        validate_csv_filename(uploaded.filename)
 
         raw_bytes = read_mylab_upload(uploaded)
         preview_df = parse_mylab_gradebook(BytesIO(raw_bytes))
@@ -2422,6 +2451,7 @@ def canvas_upload():
         uploaded = request.files.get("file")
         if not uploaded or uploaded.filename == "":
             raise ValueError("Please upload a Canvas gradebook CSV file.")
+        validate_csv_filename(uploaded.filename)
 
         raw_bytes, rows = read_canvas_rows(uploaded)
         header_candidates = detect_canvas_header_candidates(rows)
