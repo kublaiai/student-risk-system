@@ -13,7 +13,6 @@ LAST_REPORT_DF = None
 LAST_EMAIL_DF = None
 LAST_FILENAME = None
 LAST_COUNTS = None
-LAST_INSTRUCTOR_NAME = "Your Instructor"
 LAST_WEIGHTS = {
     "homework": 20.0,
     "quiz": 10.0,
@@ -673,7 +672,6 @@ CANVAS_UPLOAD_HTML = """
           <button class="btn" type="submit">Upload and Preview Columns</button>
         </div>
       </form>
-      <p class="subtle" style="margin-top:12px;">A sample file has been added at <code>{{ sample_path }}</code> if you want a quick test case.</p>
     </div>
     {% else %}
     <div class="flow-grid">
@@ -1498,7 +1496,7 @@ def render_mylab_upload(error_message=None, upload_ready=False, **kwargs):
         "error_message": error_message,
         "upload_ready": upload_ready,
         "filename": "",
-        "instructor_name": LAST_INSTRUCTOR_NAME,
+        "instructor_name": "",
         "detected_category_list": [],
         "category_summary": [],
         "preview_table": "<p class='muted'>No preview available yet.</p>",
@@ -2341,7 +2339,7 @@ def render_canvas_upload(error_message=None, mapping_ready=False, **kwargs):
         "error_message": error_message,
         "mapping_ready": mapping_ready,
         "filename": "",
-        "instructor_name": LAST_INSTRUCTOR_NAME,
+        "instructor_name": "",
         "header_candidates": [],
         "selected_header_row": 0,
         "weighted_preview_table": "",
@@ -2365,7 +2363,6 @@ def render_canvas_upload(error_message=None, mapping_ready=False, **kwargs):
         "show_weights": True,
         "header_detection_confident": False,
         "weights": LAST_CANVAS_WEIGHTS,
-        "sample_path": "/Users/nashinikhan/Desktop/student_risk_system/sample_canvas_gradebook.csv",
     }
     defaults.update(kwargs)
     return render_template_string(CANVAS_UPLOAD_HTML, **defaults)
@@ -2383,14 +2380,12 @@ def health():
 
 @app.route("/mylab-upload", methods=["GET", "POST"])
 def mylab_upload():
-    global LAST_MYLAB_UPLOAD, LAST_INSTRUCTOR_NAME
+    global LAST_MYLAB_UPLOAD
 
     if request.method == "GET":
         return render_mylab_upload()
 
     instructor_name = request.form.get("instructor_name", "").strip() or "Your Instructor"
-    LAST_INSTRUCTOR_NAME = instructor_name
-
     try:
         uploaded = request.files.get("file")
         if not uploaded or uploaded.filename == "":
@@ -2419,14 +2414,12 @@ def mylab_upload():
 
 @app.route("/canvas-upload", methods=["GET", "POST"])
 def canvas_upload():
-    global LAST_CANVAS_UPLOAD, LAST_INSTRUCTOR_NAME
+    global LAST_CANVAS_UPLOAD
 
     if request.method == "GET":
         return render_canvas_upload()
 
     instructor_name = request.form.get("instructor_name", "").strip() or "Your Instructor"
-    LAST_INSTRUCTOR_NAME = instructor_name
-
     try:
         if request.form.get("action") == "refresh":
             if not LAST_CANVAS_UPLOAD:
@@ -2483,14 +2476,12 @@ def canvas_upload():
 
 @app.route("/canvas-analyze", methods=["POST"])
 def canvas_analyze():
-    global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_CANVAS_WEIGHTS, LAST_INSTRUCTOR_NAME
+    global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_CANVAS_WEIGHTS
 
     if not LAST_CANVAS_UPLOAD:
         return render_canvas_upload(error_message="Please upload a Canvas CSV file first."), 400
 
     instructor_name = request.form.get("instructor_name", "").strip() or "Your Instructor"
-    LAST_INSTRUCTOR_NAME = instructor_name
-
     try:
         header_row = int(request.form.get("header_row", LAST_CANVAS_UPLOAD["selected_header_row"]))
         weights = parse_canvas_weights(request.form)
@@ -2611,12 +2602,10 @@ def canvas_analyze():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_INSTRUCTOR_NAME, LAST_WEIGHTS, LAST_MYLAB_UPLOAD
+    global LAST_REPORT_DF, LAST_EMAIL_DF, LAST_FILENAME, LAST_COUNTS, LAST_WEIGHTS, LAST_MYLAB_UPLOAD
 
     uploaded = request.files.get("file")
     instructor_name = request.form.get("instructor_name", "").strip() or "Your Instructor"
-    LAST_INSTRUCTOR_NAME = instructor_name
-
     try:
         selected_weights = parse_grading_weights(request.form)
     except ValueError as exc:
@@ -2635,7 +2624,7 @@ def analyze():
             error_message=str(exc),
             upload_ready=bool(LAST_MYLAB_UPLOAD),
             filename=LAST_MYLAB_UPLOAD["filename"] if LAST_MYLAB_UPLOAD else "",
-            instructor_name=LAST_INSTRUCTOR_NAME,
+            instructor_name=instructor_name,
             detected_category_list=detected_category_list,
             category_summary=category_summary,
             preview_table=preview_table,
@@ -2658,7 +2647,7 @@ def analyze():
             raise ValueError("Please upload a CSV file.")
 
         LAST_WEIGHTS = selected_weights
-        full_df = process_mylab_csv(file_stream, LAST_INSTRUCTOR_NAME, LAST_WEIGHTS)
+        full_df = process_mylab_csv(file_stream, instructor_name, LAST_WEIGHTS)
         full_df, df, excluded_names = apply_exclusion_flags(full_df, "Student_Display_Name")
         LAST_FILENAME = active_filename
         LAST_COUNTS = df["Risk_Level"].value_counts().to_dict()
@@ -2691,7 +2680,7 @@ def analyze():
         return render_template_string(
             MYLAB_RESULTS_HTML,
             filename=LAST_FILENAME,
-            instructor_name=LAST_INSTRUCTOR_NAME,
+            instructor_name=instructor_name,
             weights=LAST_WEIGHTS,
             total_students=total_students,
             excluded_count=len(excluded_names),
@@ -2728,7 +2717,7 @@ def analyze():
             ),
             upload_ready=bool(LAST_MYLAB_UPLOAD),
             filename=LAST_MYLAB_UPLOAD["filename"] if LAST_MYLAB_UPLOAD else "",
-            instructor_name=LAST_INSTRUCTOR_NAME,
+            instructor_name=instructor_name,
             detected_category_list=detected_category_list,
             category_summary=category_summary,
             preview_table=preview_table,
